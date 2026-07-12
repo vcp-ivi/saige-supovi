@@ -3,19 +3,6 @@
 YOLO-based pipeline for detecting tagged bird plates in photographs, evaluating
 YOLO vs SAHI inference, and running a downstream crop/OCR/color-analysis step.
 
-## Files To Version
-
-The intended push payload is:
-
-- `scripts/*.py`
-- `requirements.txt`
-- `README.md`
-- `outputs/grid_search_big/summary.csv`
-- `outputs/grid_search_big/yolo26s_i1024_m0p5_s0p05_t0p02_e0p0_hs0p3_hv0p4_f0p0/weights/best.pt`
-
-Do not commit local virtual environments, generated training runs, dataset
-images, caches, or unrelated checkpoint folders.
-
 ## Selected Model
 
 The selected detector checkpoint is:
@@ -75,10 +62,3 @@ Run tag detection, crop extraction, optional OCR, and color estimation:
 .\.venv311\Scripts\python.exe .\scripts\tag_ocr_pipeline.py --source data\yolo\images\test --output outputs\tag_ocr_pipeline --conf 0.05
 ```
 
-## Notes
-
-- `yolo26s.pt` and `yolo26n.pt` are base pretrained weights and do not need to
-  be committed if they can be downloaded again.
-- The selected `best.pt` is project output and should be committed only if the
-  repository is expected to carry model weights. Prefer Git LFS if the remote
-  enforces strict binary limits.
