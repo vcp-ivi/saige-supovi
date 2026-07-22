@@ -17,8 +17,6 @@ env/
 
 .vscode/
 .idea/
-
-# PyCharm
 *.iml
 
 # ===========================================
@@ -36,27 +34,56 @@ dist/
 *.pt
 
 # ===========================================
-# YOLO training outputs
+# Dataset
 # ===========================================
 
-runs/
+# Ignore dataset contents
+data/raw/*
+data/yolo/*
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/yolo/.gitkeep
+
+# Keep subdirectories
+!data/raw/images/
+!data/yolo/images/
+!data/yolo/labels/
+
+# Ignore their contents
+data/raw/images/*
+data/yolo/images/*
+data/yolo/labels/*
+
+# Keep folder structure
+!data/raw/images/.gitkeep
+!data/yolo/images/.gitkeep
+!data/yolo/labels/.gitkeep
+
+# Ignore generated files
+data/raw/annotations.csv
+data/yolo/data.yaml
+
+# ===========================================
+# Models
+# ===========================================
+
+models/*
+!models/.gitkeep
 
 # ===========================================
 # Outputs
 # ===========================================
 
-outputs/
+outputs/*
+!outputs/.gitkeep
 
 # ===========================================
-# Dataset
+# Training runs
 # ===========================================
 
-data/raw/
-data/yolo/
-
-# Keep directory structure
-!data/raw/.gitkeep
-!data/yolo/.gitkeep
+runs/*
+!runs/.gitkeep
 
 # ===========================================
 # Misc
