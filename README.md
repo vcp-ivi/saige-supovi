@@ -1,63 +1,281 @@
-# Bird Tag Detection Pipeline
+# Wing Tag Detection and Recognition Pipeline
 
-YOLO-based pipeline for detecting tagged bird plates in photographs, evaluating
-YOLO vs SAHI inference, and running a downstream crop/OCR/color-analysis step.
+A computer vision pipeline for detecting griffon vulture wing tags, identifying their colors, and reading the alphanumeric code printed on each tag.
 
-## Selected Model
+The project combines:
 
-The selected detector checkpoint is:
+- **YOLO** for wing tag detection
+- **OpenCV** for wing tag color classification
+- **EasyOCR** for optical character recognition (OCR)
 
-```text
-outputs/grid_search_big/yolo26s_i1024_m0p5_s0p05_t0p02_e0p0_hs0p3_hv0p4_f0p0/weights/best.pt
+---
+
+# Pipeline Overview
+
+```
+Input Image
+      │
+      ▼
+YOLO
+Wing Tag Detection
+      │
+      ▼
+Crop Each Detected Tag
+      │
+      ├──────────────► Color Detection (OpenCV)
+      │
+      └──────────────► OCR (EasyOCR)
+      │
+      ▼
+Final Prediction
 ```
 
-Training configuration for that run:
+For every detected wing tag, the pipeline returns:
 
-- Base model: `yolo26s.pt`
-- Image size: `1024`
-- Mosaic: `0.5`
-- Scale: `0.05`
-- Translate: `0.02`
-- Erasing: `0.0`
-- HSV saturation: `0.3`
-- HSV value: `0.4`
-- Horizontal flip: `0.0`
-- Visual confidence used for comparison: `0.02`
-- IoU threshold: `0.5`
+- Bounding box
+- Detection confidence
+- Plate color
+- Text color
+- Color confidence
+- Recognized text
+- OCR confidence
 
-The full grid-search table is stored in
-`outputs/grid_search_big/summary.csv`.
+---
 
-## Setup
+# Project Structure
 
-```powershell
-python -m venv .venv311
-.\.venv311\Scripts\python.exe -m pip install --upgrade pip
-.\.venv311\Scripts\python.exe -m pip install -r requirements.txt
+```
+project/
+│
+├── config.py
+├── prepare_dataset.py
+├── train.py
+├── predict.py
+├── visualize_dataset.py
+│
+├── color_utils.py
+├── ocr_utils.py
+├── image_utils.py
+│
+├── data/
+│   ├── raw/
+│   └── yolo/
+│
+├── outputs/
+├── prediction/
+└── runs/
 ```
 
-## Main Scripts
+---
 
-Prepare the YOLO dataset from annotated images:
+# Script Overview
 
-```powershell
-.\.venv311\Scripts\python.exe .\scripts\prepare_yolo_dataset.py --overwrite
+| Script 					| Purpose 
+|---------------------------|---------------------------
+| **prepare_dataset.py** 	| Converts the annotated dataset into the YOLO format, creates the train/validation/test split and generates `data.yaml`. 
+| **visualize_dataset.py** 	| Displays annotated images for dataset inspection and quality control. 
+| **train.py** 				| Trains a YOLO detector and copies the best model to the output directory. 
+| **predict.py** 			| Runs the complete inference pipeline on a single image or an entire directory. 
+| **color_utils.py** 		| Determines wing tag plate and text colors using classical computer vision techniques. 
+| **ocr_utils.py** 			| Reads the wing tag identifier using EasyOCR. 
+| **image_utils.py** 		| Helper functions for loading and enumerating image files. 
+| **config.py** 			| Central configuration file containing paths, model parameters and project settings. 
+
+
+---
+
+# Dataset Preparation
+
+The repository expects the original images and annotation file to be placed inside
+
+```
+data/raw/
 ```
 
-Validate source annotations and generated YOLO labels:
+Run
 
-```powershell
-.\.venv311\Scripts\python.exe .\scripts\validate_dataset.py
+```bash
+python prepare_dataset.py
 ```
 
-Run grid search:
+This script automatically:
 
-```powershell
-.\.venv311\Scripts\python.exe .\scripts\grid_search_yolo_sahi.py --output-dir outputs\grid_search_big
+- creates the train/validation/test split
+- converts annotations to the YOLO format
+- generates label files
+- creates the YOLO `data.yaml` configuration file
+
+---
+
+# Dataset Visualization
+
+Inspect random 5 images:
+
+```bash
+python visualize_dataset.py
 ```
 
-Run tag detection, crop extraction, optional OCR, and color estimation:
+Inspect a specific image:
 
-```powershell
-.\.venv311\Scripts\python.exe .\scripts\tag_ocr_pipeline.py --source data\yolo\images\test --output outputs\tag_ocr_pipeline --conf 0.05
+```bash
+python visualize_dataset.py --image IMG_0123.jpg
 ```
+
+Inspect multiple random images:
+
+```bash
+python visualize_dataset.py --num 20
+```
+
+---
+
+# Training
+
+Train the detector:
+
+```bash
+python train.py
+```
+
+The best-performing model is automatically copied to
+
+```
+outputs/models/best.pt
+```
+
+The training configuration (model, image size, epochs, batch size, etc.) is defined in `config.py`.
+
+---
+
+# Prediction
+
+Run inference on a single image:
+
+```bash
+python predict.py --image path/to/image.jpg
+```
+
+Run inference on an entire directory:
+
+```bash
+python predict.py --directory path/to/images
+```
+
+Annotated images are saved to
+
+```
+prediction/
+```
+
+---
+
+# Prediction Pipeline
+
+The prediction pipeline consists of four consecutive stages.
+
+## 1. Wing Tag Detection
+
+The input image is processed by a YOLO object detector trained to identify griffon vulture wing tags.
+
+For every detected tag, the detector returns:
+
+- bounding box
+- confidence score
+- class label
+
+Each detected tag is cropped and processed independently by the remaining stages of the pipeline.
+
+---
+
+## 2. Color Detection (`color_utils.py`)
+
+The cropped wing tag is analyzed using classical computer vision techniques.
+
+The processing steps are:
+
+1. Crop the central region of the detection to reduce background.
+2. Convert the image from RGB to HSV.
+3. Threshold the image using predefined HSV color ranges.
+4. Determine the dominant wing tag plate color.
+5. Extract the largest connected component.
+6. Reconstruct the plate using its convex hull.
+7. Search only for text colors that are valid for the detected plate color.
+8. Compute a color confidence score based on the proportion of supporting pixels.
+
+This module is entirely based on OpenCV image processing.
+
+---
+
+## 3. Optical Character Recognition (`ocr_utils.py`)
+
+The cropped wing tag is preprocessed before OCR.
+
+The preprocessing consists of:
+
+- conversion to grayscale
+- image upscaling
+- Gaussian blur
+
+The processed image is passed to EasyOCR, which returns all detected text candidates.
+
+The candidate with the highest confidence is selected as the final wing tag identifier.
+
+---
+
+## 4. Result Visualization (`predict.py`)
+
+Finally, all results are combined into a single prediction.
+
+For every detected wing tag, the output image contains:
+
+- bounding box
+- detection confidence
+- plate color
+- text color
+- recognized identifier
+- OCR confidence
+
+The annotated image is written to the `prediction/` directory.
+
+---
+
+# Output Format
+
+Each detected wing tag contains the following information.
+
+| Field 				| Description 
+|-----------------------|-----------------------
+| `bbox` 				| Bounding box coordinates 
+| `confidence` 			| Detection confidence 
+| `plate_color` 		| Detected wing tag plate color 
+| `text_color` 			| Detected text color 
+| `color_confidence` 	| Confidence of the color classification 
+| `text` 				| Recognized wing tag identifier 
+| `text_confidence` 	| OCR confidence 
+
+---
+
+# Configuration
+
+Most project settings are located in
+
+```
+config.py
+```
+
+These include:
+
+- dataset paths
+- train/validation/test split
+- model configuration
+- image size
+- batch size
+- confidence threshold
+- output directories
+- supported image extensions
+
+---
+
+# License
+
+This repository was developed as part of an internal research project at the Institute for Artificial Intelligence Research and Development of Serbia (IVI).
