@@ -52,6 +52,8 @@ project/
 ├── train.py
 ├── predict.py
 ├── visualize_dataset.py
+├── merge_dataset.py
+├── dataset_statistics.py
 │
 ├── color_utils.py
 ├── ocr_utils.py
@@ -70,29 +72,71 @@ project/
 
 # Script Overview
 
-| Script 					| Purpose 
-|---------------------------|---------------------------
-| **prepare_dataset.py** 	| Converts the annotated dataset into the YOLO format, creates the train/validation/test split and generates `data.yaml`. 
-| **visualize_dataset.py** 	| Displays annotated images for dataset inspection and quality control. 
-| **train.py** 				| Trains a YOLO detector and copies the best model to the output directory. 
-| **predict.py** 			| Runs the complete inference pipeline on a single image or an entire directory. 
-| **color_utils.py** 		| Determines wing tag plate and text colors using classical computer vision techniques. 
-| **ocr_utils.py** 			| Reads the wing tag identifier using EasyOCR. 
-| **image_utils.py** 		| Helper functions for loading and enumerating image files. 
-| **config.py** 			| Central configuration file containing paths, model parameters and project settings. 
-
+| Script | Purpose |
+|---------------------------|---------------------------|
+| **merge_dataset.py** | Merges a new raw dataset into the existing raw dataset, automatically renaming duplicate images and updating annotations. |
+| **dataset_statistics.py** | Displays summary statistics of the raw annotation dataset. |
+| **prepare_dataset.py** | Converts the raw dataset into the YOLO format, creates the train/validation/test split and generates `data.yaml`. |
+| **visualize_dataset.py** | Displays annotated images from the YOLO dataset for inspection and quality control. |
+| **train.py** | Trains a YOLO detector using the YOLO dataset and copies the best model to the output directory. |
+| **predict.py** | Runs the complete inference pipeline on a single image or an entire directory. |
+| **color_utils.py** | Determines wing tag plate and text colors using classical computer vision techniques. |
+| **ocr_utils.py** | Reads the wing tag identifier using EasyOCR. |
+| **image_utils.py** | Helper functions for loading and enumerating image files. |
+| **config.py** | Central configuration file containing paths, model parameters and project settings. |
 
 ---
 
-# Dataset Preparation
+# Raw Dataset
 
-The repository expects the original images and annotation file to be placed inside
+The repository stores the original images and annotation file inside
 
 ```
 data/raw/
 ```
 
-Run
+The raw dataset consists of:
+
+- original images
+- `annotations.csv`
+
+### Dataset Merging
+
+Merge a new annotated dataset into the existing raw dataset:
+
+```bash
+python merge_dataset.py path/to/new_dataset
+```
+
+The input directory must contain the images together with an `annotations.csv` file.
+
+The script automatically:
+
+- copies supported images into `data/raw/images`
+- appends annotations to `data/raw/annotations.csv`
+- renames duplicate image filenames and updates the corresponding annotations
+
+---
+
+### Dataset Statistics
+
+Display summary statistics for the raw dataset:
+
+```bash
+python dataset_statistics.py
+```
+
+The script reports:
+
+- plate/text color combinations and their frequencies
+- unique wing tag identifiers and their frequencies
+- identifier frequencies grouped by plate/text color combination
+
+---
+
+### Dataset Preparation
+
+Convert the raw dataset into the YOLO dataset:
 
 ```bash
 python prepare_dataset.py
@@ -107,7 +151,15 @@ This script automatically:
 
 ---
 
-# Dataset Visualization
+# YOLO Dataset
+
+After running `prepare_dataset.py`, the generated YOLO dataset is stored in
+
+```
+data/yolo/
+```
+
+### Dataset Visualization
 
 Inspect random 5 images:
 
@@ -243,15 +295,15 @@ The annotated image is written to the `prediction/` directory.
 
 Each detected wing tag contains the following information.
 
-| Field 				| Description 
-|-----------------------|-----------------------
-| `bbox` 				| Bounding box coordinates 
-| `confidence` 			| Detection confidence 
-| `plate_color` 		| Detected wing tag plate color 
-| `text_color` 			| Detected text color 
-| `color_confidence` 	| Confidence of the color classification 
-| `text` 				| Recognized wing tag identifier 
-| `text_confidence` 	| OCR confidence 
+| Field | Description |
+|-----------------------|-----------------------|
+| `bbox` | Bounding box coordinates |
+| `confidence` | Detection confidence |
+| `plate_color` | Detected wing tag plate color |
+| `text_color` | Detected text color |
+| `color_confidence` | Confidence of the color classification |
+| `text` | Recognized wing tag identifier |
+| `text_confidence` | OCR confidence |
 
 ---
 

@@ -1,0 +1,8 @@
+easyocr
+numpy
+opencv-python
+Pillow
+PyYAML
+torch
+torchvision
+ultralytics
