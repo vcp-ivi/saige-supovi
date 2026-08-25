@@ -37,6 +37,21 @@ PREDICTION_DIRECTORY = OUTPUT_DIRECTORY / "predictions"
 
 RUN_DIRECTORY = PROJECT_ROOT / "runs"
 
+PADDLEOCR_MODEL_DIRECTORY = (
+    PROJECT_ROOT
+    / "models"
+    / "paddleocr"
+)
+
+PADDLEOCR_MODEL_PATH = (
+    PADDLEOCR_MODEL_DIRECTORY
+)
+
+PADDLEOCR_CHARACTER_DICT = (
+    PADDLEOCR_MODEL_DIRECTORY
+    / "character_dict.txt"
+)
+
 
 # =============================================================================
 # DATASET SETTINGS
@@ -188,6 +203,10 @@ LABEL_TEXT_COLOR = (0, 0, 0)
 
 LABEL_BACKGROUND_COLOR = (0, 255, 0)
 
+# Prediction pipeline
+ENABLE_COLOR_CLASSIFICATION = True  # yes/no to color classification
+ENABLE_OCR = True  # yes/no to text reading
+
 
 # =============================================================================
 # TAG COLOR COMBINATIONS
@@ -203,22 +222,38 @@ VALID_TAG_TYPES = [
     },
     {
         "plate_color": "yellow",
-        "text_color": "black",
-    },
-    {
-        "plate_color": "yellow",
         "text_color": "blue",
     },
     {
-        "plate_color": "blue",
+        "plate_color": "yellow",
+        "text_color": "black",
+    },
+    {
+        "plate_color": "gray",
+        "text_color": "black",
+    },
+    {
+        "plate_color": "cyan",
         "text_color": "yellow",
+    },
+    {
+        "plate_color": "cyan",
+        "text_color": "blue",
+    },
+    {
+        "plate_color": "cyan",
+        "text_color": "white",
+    },
+    {
+        "plate_color": "white",
+        "text_color": "black",
     },
     {
         "plate_color": "black",
         "text_color": "white",
     },
     {
-        "plate_color": "white",
+        "plate_color": "magenta",
         "text_color": "black",
     },
 ]

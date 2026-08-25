@@ -49,23 +49,38 @@ DEBUG_COLOR_DETECTION = False
 # Value:      0–255
 HSV_COLOR_RANGES = {
     "red": [
-        ((0, 80, 50), (12, 255, 255)),
-        ((165, 80, 50), (179, 255, 255)),
+        ((0, 35, 50), (12, 255, 255)),
+        ((160, 35, 50), (179, 255, 255)),
     ],
+
     "yellow": [
         ((13, 70, 70), (42, 255, 255)),
     ],
-    "blue": [
-        ((80, 60, 40), (135, 255, 255)),
+
+    "cyan": [
+        ((75, 50, 50), (100, 255, 255)),
     ],
+
+    "blue": [
+        ((100, 60, 40), (135, 255, 255)),
+    ],
+
+    "magenta": [
+        ((135, 50, 50), (160, 255, 255)),
+    ],
+
     "black": [
         ((0, 0, 0), (179, 70, 50)),
     ],
+
+    "gray": [
+        ((0, 0, 50), (179, 35, 170)),
+    ],
+
     "white": [
-        ((0, 0, 140), (179, 80, 255)),
+        ((0, 0, 170), (179, 35, 255)),
     ],
 }
-
 
 def detect_tag_colors(crop: np.ndarray) -> dict[str, Any]:
     """
@@ -118,12 +133,8 @@ def detect_tag_colors(crop: np.ndarray) -> dict[str, Any]:
     plate_score = plate_result["score"]
     plate_counts = plate_result["counts"]
 
-    plate_component = _find_largest_component(
-        plate_mask,
-    )
-
     reconstructed_plate = _reconstruct_plate_mask(
-        plate_component,
+        plate_mask,
         reference_mask=plate_mask,
     )
 
@@ -193,38 +204,81 @@ def _find_plate_color(
     hsv_crop: np.ndarray,
 ) -> dict[str, Any] | None:
     """
-    Determine which valid plate color occupies the largest part of the crop.
+    Determine the most likely plate color.
+
+    Plate colors are scored using both:
+    - total matching pixels
+    - largest connected component
+
+    This reduces sensitivity to fragmented plate masks while
+    still limiting interference from scattered background pixels.
     """
 
     color_masks = {}
     color_counts = {}
+    color_scores = {}
 
     for color_name in PLATE_COLORS:
-        mask = _create_color_mask(
+
+        full_mask = _create_color_mask(
             hsv_crop,
             color_name,
         )
 
-        color_masks[color_name] = mask
-        color_counts[color_name] = cv2.countNonZero(
-            mask,
+        total_count = cv2.countNonZero(
+            full_mask,
         )
 
-    if not color_counts:
+        largest_component = _find_largest_component(
+            full_mask,
+        )
+
+        if largest_component is None:
+
+            component_mask = np.zeros_like(
+                full_mask
+            )
+
+            component_count = 0
+
+        else:
+
+            component_mask = largest_component
+
+            component_count = cv2.countNonZero(
+                component_mask,
+            )
+
+        #
+        # Combine global color evidence with spatial coherence.
+        #
+
+        color_score = (
+            0.5 * total_count
+            + 0.5 * component_count
+        )
+
+        color_masks[color_name] = component_mask
+        color_counts[color_name] = total_count
+        color_scores[color_name] = color_score
+
+    if not color_scores:
         return None
 
     plate_color = max(
-        color_counts,
-        key=color_counts.get,
+        color_scores,
+        key=color_scores.get,
     )
 
-    winning_count = color_counts[plate_color]
+    winning_score = color_scores[
+        plate_color
+    ]
 
-    if winning_count == 0:
+    if winning_score <= 0:
         return None
 
     plate_score = _calculate_pixel_fraction(
-        pixel_count=winning_count,
+        pixel_count=color_counts[plate_color],
         image_shape=hsv_crop.shape[:2],
     )
 
@@ -242,7 +296,10 @@ def _find_text_color(
     plate_mask: np.ndarray,
 ) -> dict[str, Any] | None:
     """
-    Determine the most likely text color inside the isolated plate.
+    Determine the most likely text color inside the detected plate.
+
+    First try direct HSV-based detection. If that fails, use the known
+    plate/text combinations as a fallback with reduced confidence.
     """
 
     valid_text_colors = _valid_text_colors_for_plate(
@@ -274,33 +331,53 @@ def _find_text_color(
             mask_inside_plate,
         )
 
-    if not color_counts:
+    #
+    # -------- Direct visual detection --------
+    #
+
+    if color_counts:
+        text_color = max(
+            color_counts,
+            key=color_counts.get,
+        )
+
+        winning_count = color_counts[text_color]
+
+        if winning_count > 0:
+            plate_pixel_count = cv2.countNonZero(
+                plate_mask,
+            )
+
+            text_score = _calculate_fraction(
+                numerator=winning_count,
+                denominator=plate_pixel_count,
+            )
+
+            return {
+                "color": text_color,
+                "mask": color_masks[text_color],
+                "score": text_score,
+                "counts": color_counts,
+                "inferred": False,
+            }
+
+    #
+    # -------- Fallback from tag-color rules --------
+    #
+
+    fallback_text_color = _fallback_text_color(
+        plate_color,
+    )
+
+    if fallback_text_color is None:
         return None
-
-    text_color = max(
-        color_counts,
-        key=color_counts.get,
-    )
-
-    winning_count = color_counts[text_color]
-
-    if winning_count == 0:
-        return None
-
-    plate_pixel_count = cv2.countNonZero(
-        plate_mask,
-    )
-
-    text_score = _calculate_fraction(
-        numerator=winning_count,
-        denominator=plate_pixel_count,
-    )
 
     return {
-        "color": text_color,
-        "mask": color_masks[text_color],
-        "score": text_score,
+        "color": fallback_text_color,
+        "mask": np.zeros_like(plate_mask),
+        "score": 0.25,
         "counts": color_counts,
+        "inferred": True,
     }
 
 
@@ -489,6 +566,29 @@ def _valid_text_colors_for_plate(
         )
     )
 
+def _fallback_text_color(
+    plate_color: str,
+) -> str | None:
+    """
+    Return the most likely text color based on known tag combinations.
+
+    Used only when direct visual text-color detection fails.
+    """
+
+    fallback_colors = {
+        "red": "yellow",
+        "yellow": "blue",
+        "gray": "black",
+        "white": "black",
+        "black": "white",
+        "magenta": "black",
+        "cyan": "yellow",
+    }
+
+    return fallback_colors.get(
+        plate_color,
+    )
+
 
 def _unknown_result() -> dict[str, Any]:
     """
@@ -504,7 +604,7 @@ def _unknown_result() -> dict[str, Any]:
 
 def _crop_center_region(
     image: np.ndarray,
-    margin_ratio: float = 0.15,
+    margin_ratio: float = 0.20,
 ) -> tuple[np.ndarray, tuple[int, int]]:
     """
     Return the central part of the crop.
@@ -597,16 +697,50 @@ def _show_debug_windows(
     text_color: str,
 ) -> None:
     """
-    Open the color-detection debug windows.
+    Open enlarged color-detection debug windows.
     """
+
+    debug_scale = 8
 
     crop_window_name = (
         f"Crop ({plate_color}/{text_color})"
     )
 
+    enlarged_crop = cv2.resize(
+        crop,
+        None,
+        fx=debug_scale,
+        fy=debug_scale,
+        interpolation=cv2.INTER_NEAREST,
+    )
+
+    enlarged_plate_mask = cv2.resize(
+        plate_mask,
+        None,
+        fx=debug_scale,
+        fy=debug_scale,
+        interpolation=cv2.INTER_NEAREST,
+    )
+
+    enlarged_reconstructed_plate = cv2.resize(
+        reconstructed_plate,
+        None,
+        fx=debug_scale,
+        fy=debug_scale,
+        interpolation=cv2.INTER_NEAREST,
+    )
+
+    enlarged_text_mask = cv2.resize(
+        text_mask,
+        None,
+        fx=debug_scale,
+        fy=debug_scale,
+        interpolation=cv2.INTER_NEAREST,
+    )
+
     cv2.imshow(
         crop_window_name,
-        crop,
+        enlarged_crop,
     )
 
     cv2.setMouseCallback(
@@ -615,22 +749,23 @@ def _show_debug_windows(
         {
             "hsv": hsv_crop,
             "bgr": crop,
+            "scale": debug_scale,
         },
     )
 
     cv2.imshow(
         f"Plate mask ({plate_color})",
-        plate_mask,
+        enlarged_plate_mask,
     )
 
     cv2.imshow(
         f"Reconstructed plate ({plate_color})",
-        reconstructed_plate,
+        enlarged_reconstructed_plate,
     )
 
     cv2.imshow(
         f"Text mask ({text_color})",
-        text_mask,
+        enlarged_text_mask,
     )
 
 
@@ -642,7 +777,7 @@ def _inspect_clicked_pixel(
     parameters: dict[str, np.ndarray],
 ) -> None:
     """
-    Print average HSV and BGR values around a clicked pixel.
+    Print HSV/BGR information for a clicked pixel and its neighborhood.
     """
 
     del flags
@@ -650,8 +785,76 @@ def _inspect_clicked_pixel(
     if event != cv2.EVENT_LBUTTONDOWN:
         return
 
+    scale = parameters.get("scale", 1)
+
+    display_x = x
+    display_y = y
+
+    x = x // scale
+    y = y // scale
+
     hsv_image = parameters["hsv"]
     bgr_image = parameters["bgr"]
+
+    #
+    # -------- Exact clicked pixel --------
+    #
+
+    hsv_pixel = hsv_image[y, x]
+    bgr_pixel = bgr_image[y, x]
+
+    h = int(hsv_pixel[0])
+    s = int(hsv_pixel[1])
+    v = int(hsv_pixel[2])
+
+    b = int(bgr_pixel[0])
+    g = int(bgr_pixel[1])
+    r = int(bgr_pixel[2])
+
+    print("\n" + "=" * 50)
+    print(
+        f"Clicked display pixel ({display_x}, {display_y}) "
+        f"-> original pixel ({x}, {y})"
+    )
+    print("-" * 50)
+
+    print(
+        f"Exact HSV = ({h}, {s}, {v})"
+    )
+
+    print(
+        f"Exact BGR = ({b}, {g}, {r})"
+    )
+
+    #
+    # -------- Determine matching configured colors --------
+    #
+
+    matching_colors = []
+
+    for color_name, ranges in HSV_COLOR_RANGES.items():
+
+        for lower, upper in ranges:
+
+            if (
+                lower[0] <= h <= upper[0]
+                and lower[1] <= s <= upper[1]
+                and lower[2] <= v <= upper[2]
+            ):
+                matching_colors.append(color_name)
+                break
+
+    if matching_colors:
+        print(
+            "Matches    : "
+            + ", ".join(matching_colors)
+        )
+    else:
+        print("Matches    : NONE")
+
+    #
+    # -------- Neighborhood --------
+    #
 
     radius = 2
 
@@ -688,36 +891,37 @@ def _inspect_clicked_pixel(
         axis=(0, 1),
     )
 
-    print(
-        f"\nClicked ({x}, {y})"
-    )
-    print(
-        f"Patch: {x1}:{x2}, {y1}:{y2}"
-    )
+    print("\n5x5 neighborhood")
+    print("-" * 50)
+
     print(
         "Average HSV = "
         f"({hsv_mean[0]:.1f}, "
         f"{hsv_mean[1]:.1f}, "
         f"{hsv_mean[2]:.1f})"
     )
+
     print(
         "Average BGR = "
         f"({bgr_mean[0]:.1f}, "
         f"{bgr_mean[1]:.1f}, "
         f"{bgr_mean[2]:.1f})"
     )
+
     print(
-        "H range: "
+        "H range     : "
         f"{hsv_patch[:, :, 0].min()} - "
         f"{hsv_patch[:, :, 0].max()}"
     )
+
     print(
-        "S range: "
+        "S range     : "
         f"{hsv_patch[:, :, 1].min()} - "
         f"{hsv_patch[:, :, 1].max()}"
     )
+
     print(
-        "V range: "
+        "V range     : "
         f"{hsv_patch[:, :, 2].min()} - "
         f"{hsv_patch[:, :, 2].max()}"
     )

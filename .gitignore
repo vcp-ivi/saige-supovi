@@ -40,25 +40,30 @@ dist/
 # Ignore dataset contents
 data/raw/*
 data/yolo/*
+data/ocr/*
 
 # Keep directory structure
 !data/raw/.gitkeep
 !data/yolo/.gitkeep
+!data/ocr/.gitkeep
 
 # Keep subdirectories
 !data/raw/images/
 !data/yolo/images/
 !data/yolo/labels/
+!data/ocr/images/
 
 # Ignore their contents
 data/raw/images/*
 data/yolo/images/*
 data/yolo/labels/*
+data/ocr/images/*
 
 # Keep folder structure
 !data/raw/images/.gitkeep
 !data/yolo/images/.gitkeep
 !data/yolo/labels/.gitkeep
+!data/raw/ocr/.gitkeep
 
 # Ignore generated files
 data/raw/annotations.csv

@@ -8,7 +8,7 @@ This script prints useful information about the annotation dataset:
 - Tag text frequencies grouped by plate/text color combination
 
 Usage:
-    python utils/analyze_annotations.py
+    python utils/dataset_statistics.py
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ from collections import Counter, defaultdict
 from pathlib import Path
 import re
 import sys
-import config
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
+import config
 
 def natural_sort_key(text: str):
     """
@@ -59,6 +59,66 @@ def print_header(title: str):
     print("-" * 50)
     print(title)
     print("-" * 50)
+
+
+def print_fallback_colors(rows):
+    """
+    Print the most common text color for each plate color.
+
+    Rows with missing or 'none' colors are ignored.
+    """
+
+    plate_to_text_colors = defaultdict(Counter)
+
+    for row in rows:
+
+        plate_color = row[config.CSV_PLATE_COLOR].strip()
+        text_color = row[config.CSV_TEXT_COLOR].strip()
+
+        if not plate_color or not text_color:
+            continue
+
+        if plate_color == "none" or text_color == "none":
+            continue
+
+        plate_to_text_colors[plate_color][text_color] += 1
+
+    fallback_colors = {}
+
+    print_header("Fallback color statistics")
+
+    for plate_color in sorted(plate_to_text_colors):
+
+        text_counts = plate_to_text_colors[plate_color]
+
+        fallback_text_color, fallback_count = text_counts.most_common(1)[0]
+
+        total_count = sum(text_counts.values())
+
+        percentage = (
+            fallback_count / total_count * 100
+        )
+
+        fallback_colors[plate_color] = fallback_text_color
+
+        print(
+            f"{plate_color:<10} -> "
+            f"{fallback_text_color:<10} "
+            f"{fallback_count}/{total_count} "
+            f"({percentage:.1f}%)"
+        )
+
+    print_header("Fallback colors")
+
+    print("fallback_colors = {")
+
+    for plate_color in sorted(fallback_colors):
+        print(
+            f'    "{plate_color}": '
+            f'"{fallback_colors[plate_color]}",'
+        )
+
+    print("}")
 
 
 def main():
@@ -168,6 +228,8 @@ def main():
             print(
                 f"{text:<{longest_text}} : {text_counts[text]}"
             )
+
+    print_fallback_colors(rows)
 
 
 if __name__ == "__main__":
