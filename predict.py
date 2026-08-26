@@ -145,7 +145,7 @@ def extract_detections(
 
         detections.append(
             {
-                "class_name": config.OBJECT_CLASSES.get(
+                "class_name": config.YOLO_OBJECT_CLASSES.get(
                     class_id,
                     str(class_id),
                 ),

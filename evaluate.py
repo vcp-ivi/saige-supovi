@@ -1,8 +1,10 @@
 """
 evaluate.py
 
-Evaluate YOLO detection, color classification and OCR against
+Evaluate YOLO detection, color classification, and OCR against
 data/raw/annotations.csv.
+
+The dataset split is selected with --split.
 
 The evaluated stages depend on config.py:
 
@@ -11,14 +13,26 @@ The evaluated stages depend on config.py:
 
 Examples
 --------
+Evaluate the validation split:
+
+    python evaluate.py --split val
+
+Evaluate the test split:
+
+    python evaluate.py --split test
+
 YOLO only:
-    python evaluate.py --folder data/yolo/images/val
+
+    ENABLE_COLOR_CLASSIFICATION = False
+    ENABLE_OCR = False
 
 YOLO + colors:
+
     ENABLE_COLOR_CLASSIFICATION = True
     ENABLE_OCR = False
 
 Full pipeline:
+
     ENABLE_COLOR_CLASSIFICATION = True
     ENABLE_OCR = True
 """
@@ -43,24 +57,19 @@ from utils.image_utils import get_images
 
 IOU_THRESHOLD = 0.50
 
-OUTPUT_FILE = (
-    config.PROJECT_ROOT
-    / "outputs"
-    / "evaluation_results.csv"
-)
-
 
 def parse_arguments():
     """Parse command-line arguments."""
 
     parser = argparse.ArgumentParser(
-        description="Evaluate predictions against annotations.csv."
+        description="Evaluate the wing-tag recognition pipeline."
     )
 
     parser.add_argument(
-        "--folder",
+        "--split",
         required=True,
-        help="Folder containing images to evaluate.",
+        choices=config.DATASET_SPLITS.keys(),
+        help="Dataset split to evaluate: train, val, or test.",
     )
 
     return parser.parse_args()
@@ -73,8 +82,8 @@ def load_annotations():
 
     annotations = defaultdict(list)
 
-    with open(
-        config.ANNOTATION_FILE,
+    with config.ANNOTATION_FILE.open(
+        mode="r",
         newline="",
         encoding="utf-8",
     ) as csv_file:
@@ -86,7 +95,7 @@ def load_annotations():
         for row in reader:
 
             image_name = (
-                row["image_file"]
+                row[config.CSV_IMAGE_FILE]
                 .strip()
                 .lower()
             )
@@ -109,10 +118,7 @@ def load_annotations():
                 .upper()
             )
 
-            #
             # Images marked none / none contain no annotated tag.
-            #
-
             if (
                 plate_color == "none"
                 and text_color == "none"
@@ -121,10 +127,18 @@ def load_annotations():
 
             try:
                 annotation = {
-                    "x1": float(row["x1"]),
-                    "y1": float(row["y1"]),
-                    "x2": float(row["x2"]),
-                    "y2": float(row["y2"]),
+                    "x1": float(
+                        row[config.CSV_X1]
+                    ),
+                    "y1": float(
+                        row[config.CSV_Y1]
+                    ),
+                    "x2": float(
+                        row[config.CSV_X2]
+                    ),
+                    "y2": float(
+                        row[config.CSV_Y2]
+                    ),
                     "plate_color": plate_color,
                     "text_color": text_color,
                     "text": plate_text,
@@ -400,9 +414,48 @@ def main():
 
     args = parse_arguments()
 
-    image_paths = get_images(
-        args.folder
+    image_directory = (
+        config.YOLO_IMAGE_DIRECTORY
+        / args.split
     )
+
+    if not image_directory.is_dir():
+        raise FileNotFoundError(
+            f"YOLO {args.split} split not found:\n"
+            f"{image_directory}\n\n"
+            "Run prepare_yolo_dataset.py first."
+        )
+
+    image_paths = get_images(
+        image_directory
+    )
+
+    if not image_paths:
+        raise ValueError(
+            f"No supported images found in:\n"
+            f"{image_directory}"
+        )
+
+    output_file = (
+        config.OUTPUT_DIRECTORY
+        / f"evaluation_{args.split}.csv"
+    )
+
+    print("=" * 60)
+    print("Evaluation")
+    print("=" * 60)
+
+    print(
+        f"Split  : "
+        f"{args.split}"
+    )
+
+    print(
+        f"Images : "
+        f"{len(image_paths)}"
+    )
+
+    print()
 
     annotations = load_annotations()
 
@@ -410,28 +463,19 @@ def main():
 
     results = []
 
-    #
     # Detection counters
-    #
-
     gt_total = 0
     detected_total = 0
     missed_total = 0
     false_positive_total = 0
 
-    #
     # Color counters
-    #
-
     plate_correct = 0
     text_color_correct = 0
     pair_correct = 0
     color_total = 0
 
-    #
     # OCR counters
-    #
-
     ocr_correct = 0
     ocr_total = 0
 
@@ -440,10 +484,7 @@ def main():
 
     unreadable_total = 0
 
-    #
     # Evaluate images
-    #
-
     for index, image_path in enumerate(
         image_paths,
         start=1,
@@ -476,10 +517,7 @@ def main():
             prediction_results
         )
 
-        #
         # Crops are only needed for colors or OCR.
-        #
-
         if (
             config.ENABLE_COLOR_CLASSIFICATION
             or config.ENABLE_OCR
@@ -520,11 +558,9 @@ def main():
             false_positives
         )
 
-        #
         # ----------------------------------------------------
         # Matched tags
         # ----------------------------------------------------
-        #
 
         for (
             gt_index,
@@ -561,10 +597,7 @@ def main():
 
             errors = []
 
-            #
             # Color evaluation
-            #
-
             plate_ok = ""
             text_color_ok = ""
             pair_ok = ""
@@ -605,10 +638,7 @@ def main():
                         "color_error"
                     )
 
-            #
             # OCR evaluation
-            #
-
             text_type = classify_text_annotation(
                 gt["text"]
             )
@@ -672,10 +702,6 @@ def main():
                     ocr_result = (
                         "not_evaluated"
                     )
-
-            #
-            # Save matched result
-            #
 
             results.append(
                 {
@@ -767,11 +793,9 @@ def main():
                 }
             )
 
-        #
         # ----------------------------------------------------
         # Missed tags
         # ----------------------------------------------------
-        #
 
         for gt_index in missed:
 
@@ -816,11 +840,9 @@ def main():
                 }
             )
 
-        #
         # ----------------------------------------------------
         # False-positive detections
         # ----------------------------------------------------
-        #
 
         for pred_index in false_positives:
 
@@ -891,22 +913,19 @@ def main():
                 }
             )
 
-    #
     # --------------------------------------------------------
     # Save CSV
     # --------------------------------------------------------
-    #
 
-    OUTPUT_FILE.parent.mkdir(
+    output_file.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
 
     if results:
 
-        with open(
-            OUTPUT_FILE,
-            "w",
+        with output_file.open(
+            mode="w",
             newline="",
             encoding="utf-8",
         ) as csv_file:
@@ -924,21 +943,21 @@ def main():
                 results
             )
 
-    #
     # --------------------------------------------------------
     # Summary
     # --------------------------------------------------------
-    #
 
     print()
     print("=" * 60)
-    print("Evaluation Summary")
+
+    print(
+        f"Evaluation Summary — "
+        f"{args.split}"
+    )
+
     print("=" * 60)
 
-    #
     # Detection
-    #
-
     print()
     print("Tag detection")
     print("-" * 60)
@@ -992,10 +1011,7 @@ def main():
         f"{recall * 100:.1f}%"
     )
 
-    #
     # Colors
-    #
-
     if config.ENABLE_COLOR_CLASSIFICATION:
 
         print()
@@ -1028,10 +1044,7 @@ def main():
                 "No matched tags available."
             )
 
-    #
     # OCR
-    #
-
     if config.ENABLE_OCR:
 
         print()
@@ -1075,7 +1088,7 @@ def main():
 
     print(
         f"Results saved to:\n"
-        f"{OUTPUT_FILE}"
+        f"{output_file}"
     )
 
 

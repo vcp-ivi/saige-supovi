@@ -190,7 +190,7 @@ def draw_yolo_annotations(image, label_path):
                 2,
             )
 
-            class_name = config.OBJECT_CLASSES.get(
+            class_name = config.YOLO_OBJECT_CLASSES.get(
                 class_id,
                 str(class_id),
             )
