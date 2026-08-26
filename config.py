@@ -1,7 +1,8 @@
 """
 config.py
 
-Central configuration file containing all user-configurable parameters for the project.
+Central configuration file containing all user-configurable parameters
+for the project.
 """
 
 from pathlib import Path
@@ -9,9 +10,6 @@ from pathlib import Path
 
 # =============================================================================
 # PROJECT PATHS
-# =============================================================================
-#
-# All project paths are created relative to this file.
 # =============================================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -22,6 +20,11 @@ RAW_DATA_DIRECTORY = DATA_DIRECTORY / "raw"
 RAW_IMAGE_DIRECTORY = RAW_DATA_DIRECTORY / "images"
 ANNOTATION_FILE = RAW_DATA_DIRECTORY / "annotations.csv"
 
+
+# =============================================================================
+# YOLO DATASET PATHS
+# =============================================================================
+
 YOLO_DATA_DIRECTORY = DATA_DIRECTORY / "yolo"
 
 YOLO_IMAGE_DIRECTORY = YOLO_DATA_DIRECTORY / "images"
@@ -29,27 +32,57 @@ YOLO_LABEL_DIRECTORY = YOLO_DATA_DIRECTORY / "labels"
 
 YOLO_DATASET_CONFIG = YOLO_DATA_DIRECTORY / "data.yaml"
 
-MODEL_DIRECTORY = PROJECT_ROOT / "models" / "yolo"
 
-OUTPUT_DIRECTORY = PROJECT_ROOT / "outputs"
+# =============================================================================
+# OCR DATASET PATHS
+# =============================================================================
 
-PREDICTION_DIRECTORY = OUTPUT_DIRECTORY / "predictions"
+OCR_DATA_DIRECTORY = DATA_DIRECTORY / "ocr"
 
-RUN_DIRECTORY = PROJECT_ROOT / "runs"
+OCR_IMAGE_DIRECTORY = OCR_DATA_DIRECTORY / "images"
 
-PADDLEOCR_MODEL_DIRECTORY = (
+OCR_CHARACTER_DICT = (
+    OCR_DATA_DIRECTORY
+    / "character_dict.txt"
+)
+
+OCR_METADATA_FILE = (
+    OCR_DATA_DIRECTORY
+    / "metadata.csv"
+)
+
+
+# =============================================================================
+# MODEL PATHS
+# =============================================================================
+
+YOLO_MODEL_DIRECTORY = (
+    PROJECT_ROOT
+    / "models"
+    / "yolo"
+)
+
+OCR_MODEL_DIRECTORY = (
     PROJECT_ROOT
     / "models"
     / "paddleocr"
 )
 
-PADDLEOCR_MODEL_PATH = (
-    PADDLEOCR_MODEL_DIRECTORY
+
+# =============================================================================
+# OUTPUT PATHS
+# =============================================================================
+
+OUTPUT_DIRECTORY = PROJECT_ROOT / "outputs"
+
+PREDICTION_DIRECTORY = (
+    OUTPUT_DIRECTORY
+    / "predictions"
 )
 
-PADDLEOCR_CHARACTER_DICT = (
-    PADDLEOCR_MODEL_DIRECTORY
-    / "character_dict.txt"
+YOLO_RUN_DIRECTORY = (
+    PROJECT_ROOT
+    / "runs"
 )
 
 
@@ -57,10 +90,7 @@ PADDLEOCR_CHARACTER_DICT = (
 # DATASET SETTINGS
 # =============================================================================
 #
-# These values control how the original dataset is split into training,
-# validation and testing datasets.
-#
-# The values should always sum to 1.0.
+# Values must sum to 1.0.
 # =============================================================================
 
 DATASET_SPLITS = {
@@ -68,6 +98,7 @@ DATASET_SPLITS = {
     "val": 0.10,
     "test": 0.10,
 }
+
 assert (
     abs(sum(DATASET_SPLITS.values()) - 1.0) < 1e-9
 ), "Dataset splits must sum to 1.0."
@@ -79,82 +110,80 @@ RANDOM_SEED = 42
 # YOLO MODEL SETTINGS
 # =============================================================================
 #
-# MODEL_NAME can be changed to any Ultralytics model, such as
+# YOLO_MODEL_NAME can be changed to another Ultralytics model:
+#
 # yolo11n.pt
 # yolo11s.pt
 # yolo11m.pt
 # yolo11l.pt
 # yolo11x.pt
-# ...
 #
-# DEVICE = 0        -> first GPU
-# DEVICE = 1        -> second GPU
-# DEVICE = "cpu"    -> CPU only
-#
-# Later this can easily be changed to YOLO26 or another model.
+# YOLO_DEVICE = 0      -> first GPU
+# YOLO_DEVICE = 1      -> second GPU
+# YOLO_DEVICE = "cpu"  -> CPU only
 # =============================================================================
 
-MODEL_NAME = "yolo11s.pt"
+YOLO_MODEL_NAME = "yolo11s.pt"
 
-DEVICE = 0
+YOLO_BEST_MODEL_NAME = "best.pt"
 
-BEST_MODEL_NAME = "best.pt"
+YOLO_DEVICE = 0
 
 
 # =============================================================================
-# TRAINING SETTINGS
+# YOLO TRAINING SETTINGS
 # =============================================================================
 
-IMAGE_SIZE = 1024
+YOLO_IMAGE_SIZE = 1024
 
-EPOCHS = 100
+YOLO_EPOCHS = 100
 
-BATCH_SIZE = 16
+YOLO_BATCH_SIZE = 16
 
-PATIENCE = 25
+YOLO_PATIENCE = 25
 
-WORKERS = 4
-
-
-# =============================================================================
-# DATA AUGMENTATION
-# =============================================================================
-#
-# Commonly changed augmentation parameters are exposed here. Add more if needed.
-# =============================================================================
-
-MOSAIC = 0.5
-
-SCALE = 0.10
-
-TRANSLATE = 0.10
-
-FLIP_LEFT_RIGHT = 0.0
-
-HSV_H = 0.015
-
-HSV_S = 0.7
-
-HSV_V = 0.4
+YOLO_WORKERS = 4
 
 
 # =============================================================================
-# CLASS DEFINITIONS
-# =============================================================================
-#
-# YOLO requires every object class to have a numerical ID.
+# YOLO DATA AUGMENTATION
 # =============================================================================
 
-OBJECT_CLASSES = {
+YOLO_MOSAIC = 0.5
+
+YOLO_SCALE = 0.10
+
+YOLO_TRANSLATE = 0.10
+
+YOLO_FLIP_LEFT_RIGHT = 0.0
+
+YOLO_HSV_H = 0.015
+
+YOLO_HSV_S = 0.7
+
+YOLO_HSV_V = 0.4
+
+
+# =============================================================================
+# YOLO CLASS DEFINITIONS
+# =============================================================================
+
+YOLO_OBJECT_CLASSES = {
     0: "wing_tag",
 }
 
 
 # =============================================================================
-# CSV COLUMN NAMES
+# OCR MODEL SETTINGS
 # =============================================================================
-#
-# The annotation CSV is expected to contain the following columns.
+
+OCR_MODEL_NAME = "PP-OCRv5_server_rec"
+
+OCR_MIN_CONFIDENCE = 0.40
+
+
+# =============================================================================
+# CSV COLUMN NAMES
 # =============================================================================
 
 CSV_IMAGE_FILE = "image_file"
@@ -186,14 +215,21 @@ SUPPORTED_IMAGE_EXTENSIONS = (
     ".tiff",
 )
 
+
 # =============================================================================
 # INFERENCE SETTINGS
 # =============================================================================
-#
-# Parameters controlling model inference and visualization.
-# =============================================================================
 
-CONFIDENCE_THRESHOLD = 0.25
+YOLO_CONFIDENCE_THRESHOLD = 0.25
+
+ENABLE_COLOR_CLASSIFICATION = True
+
+ENABLE_OCR = True
+
+
+# =============================================================================
+# VISUALIZATION SETTINGS
+# =============================================================================
 
 LINE_THICKNESS = 2
 
@@ -203,16 +239,9 @@ LABEL_TEXT_COLOR = (0, 0, 0)
 
 LABEL_BACKGROUND_COLOR = (0, 255, 0)
 
-# Prediction pipeline
-ENABLE_COLOR_CLASSIFICATION = True  # yes/no to color classification
-ENABLE_OCR = True  # yes/no to text reading
-
 
 # =============================================================================
 # TAG COLOR COMBINATIONS
-# =============================================================================
-
-# Valid plate and text color combinations currently present in the dataset.
 # =============================================================================
 
 VALID_TAG_TYPES = [

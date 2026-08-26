@@ -1,5 +1,5 @@
 """
-prepare_dataset.py
+prepare_yolo_dataset.py
 
 Convert the original wing-tag annotations into a YOLO dataset.
 
@@ -294,7 +294,7 @@ def create_data_yaml() -> None:
     """
     class_names = [
         class_name
-        for _, class_name in sorted(config.OBJECT_CLASSES.items())
+        for _, class_name in sorted(config.YOLO_OBJECT_CLASSES.items())
     ]
 
     dataset_config = {

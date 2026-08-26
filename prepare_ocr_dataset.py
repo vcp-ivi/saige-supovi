@@ -65,25 +65,18 @@ import cv2
 import config
 
 
-OCR_DIRECTORY = (
-    config.PROJECT_ROOT
-    / "data"
-    / "ocr"
-)
+OCR_DIRECTORY = config.OCR_DATA_DIRECTORY
 
 OCR_IMAGE_DIRECTORY = (
-    OCR_DIRECTORY
-    / "images"
+    config.OCR_IMAGE_DIRECTORY
 )
 
 OCR_CHARACTER_DICT = (
-    OCR_DIRECTORY
-    / "character_dict.txt"
+    config.OCR_CHARACTER_DICT
 )
 
 OCR_METADATA_FILE = (
-    OCR_DIRECTORY
-    / "metadata.csv"
+    config.OCR_METADATA_FILE
 )
 
 AUGMENTED_IMAGE_DIRECTORY = (

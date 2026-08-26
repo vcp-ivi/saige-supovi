@@ -43,7 +43,7 @@ if config.ENABLE_COLOR_CLASSIFICATION:
     from utils.color_utils import detect_tag_colors
 
 if config.ENABLE_OCR:
-    from utils.paddle_ocr_utils import read_tag_text
+    from utils.ocr_utils import read_tag_text
 
 
 def parse_arguments():
@@ -74,14 +74,14 @@ def load_model():
     """Load the trained YOLO model."""
 
     model_path = (
-        config.MODEL_DIRECTORY
-        / config.BEST_MODEL_NAME
+        config.YOLO_MODEL_DIRECTORY
+        / config.YOLO_BEST_MODEL_NAME
     )
 
     if not model_path.is_file():
         raise FileNotFoundError(
             f"Model not found:\n{model_path}\n\n"
-            "Run train.py first."
+            "Run train_yolo.py first."
         )
 
     return YOLO(model_path)
@@ -106,7 +106,7 @@ def run_inference(
 
     prediction_results = model(
         image,
-        conf=config.CONFIDENCE_THRESHOLD,
+        conf=config.YOLO_CONFIDENCE_THRESHOLD,
         verbose=False,
     )[0]
 

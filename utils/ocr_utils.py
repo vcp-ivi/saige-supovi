@@ -1,10 +1,8 @@
 """
-paddle_ocr_utils.py
+ocr_utils.py
 
 OCR utilities using the fine-tuned PaddleOCR wing-tag model.
 """
-
-from pathlib import Path
 
 import cv2
 
@@ -45,13 +43,11 @@ import config
 
 DEBUG_OCR = False
 
-OCR_MIN_CONFIDENCE = 0.40
-
 
 _READER = TextRecognition(
-    model_name="PP-OCRv5_server_rec",
+    model_name=config.OCR_MODEL_NAME,
     model_dir=str(
-        config.PADDLEOCR_MODEL_PATH
+        config.OCR_MODEL_DIRECTORY
     ),
 )
 
@@ -182,7 +178,7 @@ def read_tag_text(crop):
 
     if (
         best["confidence"]
-        < OCR_MIN_CONFIDENCE
+        < config.OCR_MIN_CONFIDENCE
     ):
 
         return {

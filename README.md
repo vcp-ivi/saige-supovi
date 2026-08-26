@@ -139,7 +139,7 @@ The script reports:
 Convert the raw dataset into the YOLO dataset:
 
 ```bash
-python prepare_dataset.py
+python prepare_yolo_dataset.py
 ```
 
 This script automatically:
@@ -186,7 +186,7 @@ python visualize_dataset.py --num 20
 Train the detector:
 
 ```bash
-python train.py
+python train_yolo.py
 ```
 
 The best-performing model is automatically copied to
