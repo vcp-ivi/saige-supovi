@@ -110,8 +110,6 @@ After installing the appropriate PaddlePaddle version, install the remaining pro
 pip install -r requirements.txt
 ```
 
-The tested direct dependencies are defined in `requirements.txt`.
-
 ---
 
 ## Raw Dataset

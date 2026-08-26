@@ -25,8 +25,8 @@ from utils.image_utils import get_images
 #
 # Import optional pipeline components only when enabled.
 #
-#  This avoids loading optional models when their pipeline stages
-#  are disabled.
+# This avoids loading optional models when their pipeline stages
+# are disabled.
 #
 
 if config.ENABLE_COLOR_CLASSIFICATION:
