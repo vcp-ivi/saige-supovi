@@ -1,8 +1,7 @@
-easyocr
+certifi
 numpy
 opencv-python
+PaddleOCR
 Pillow
 PyYAML
-torch
-torchvision
 ultralytics
