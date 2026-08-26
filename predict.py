@@ -35,8 +35,8 @@ from utils.image_utils import get_images
 #
 # Import optional pipeline components only when enabled.
 #
-# This is particularly important for EasyOCR because importing
-# ocr_utils initializes the OCR model.
+#  This avoids loading optional models when their pipeline stages
+#  are disabled.
 #
 
 if config.ENABLE_COLOR_CLASSIFICATION:

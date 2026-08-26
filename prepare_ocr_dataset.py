@@ -4,12 +4,18 @@ prepare_ocr_dataset.py
 Create a PaddleOCR text-recognition dataset from wing-tag annotations.
 
 The existing YOLO train/val/test image split is reused so that OCR
-training and evaluation remain separated by source image.
+training, validation, and testing remain separated by source image.
 
 Only fully readable tag annotations are included.
 Annotations containing "*" are excluded.
 
-Output:
+Optionally, the training set can be augmented with 90°, 180°, and
+270° rotations.
+
+Outputs
+-------
+Without augmentation:
+
     data/ocr/
         images/
             train/
@@ -21,12 +27,35 @@ Output:
         character_dict.txt
         metadata.csv
 
-Usage:
+With --augment:
+
+    data/ocr/
+        images/
+            train/
+            val/
+            test/
+            train_augmented/
+        train.txt
+        train_augmented.txt
+        val.txt
+        test.txt
+        character_dict.txt
+        metadata.csv
+
+Examples
+--------
+Prepare the OCR dataset:
+
     python prepare_ocr_dataset.py
+
+Prepare the dataset and create rotated training samples:
+
+    python prepare_ocr_dataset.py --augment
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import shutil
 from pathlib import Path
@@ -57,6 +86,16 @@ OCR_METADATA_FILE = (
     / "metadata.csv"
 )
 
+AUGMENTED_IMAGE_DIRECTORY = (
+    OCR_IMAGE_DIRECTORY
+    / "train_augmented"
+)
+
+AUGMENTED_LABEL_FILE = (
+    OCR_DIRECTORY
+    / "train_augmented.txt"
+)
+
 OCR_CHARACTERS = (
     "0123456789"
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -64,16 +103,40 @@ OCR_CHARACTERS = (
 
 CROP_MARGIN_RATIO = 0.05
 
+ROTATIONS = {
+    "r90": cv2.ROTATE_90_CLOCKWISE,
+    "r180": cv2.ROTATE_180,
+    "r270": cv2.ROTATE_90_COUNTERCLOCKWISE,
+}
+
+
+def parse_arguments():
+    """Parse command-line arguments."""
+
+    parser = argparse.ArgumentParser(
+        description="Prepare the PaddleOCR wing-tag dataset."
+    )
+
+    parser.add_argument(
+        "--augment",
+        action="store_true",
+        help=(
+            "Create additional 90°, 180°, and 270° rotations "
+            "of every training crop."
+        ),
+    )
+
+    return parser.parse_args()
+
 
 def load_annotations():
     """Load annotation rows."""
 
-    with open(
-        config.ANNOTATION_FILE,
+    with config.ANNOTATION_FILE.open(
+        mode="r",
         newline="",
         encoding="utf-8",
     ) as csv_file:
-
         return list(
             csv.DictReader(csv_file)
         )
@@ -86,15 +149,10 @@ def get_split_lookup():
 
     split_lookup = {}
 
-    for split in (
-        "train",
-        "val",
-        "test",
-    ):
+    for split in config.DATASET_SPLITS:
 
         split_directory = (
-            config.YOLO_DATA_DIRECTORY
-            / "images"
+            config.YOLO_IMAGE_DIRECTORY
             / split
         )
 
@@ -106,25 +164,36 @@ def get_split_lookup():
             if not image_path.is_file():
                 continue
 
-            split_lookup[
-                image_path.name.lower()
-            ] = split
+            image_key = (
+                image_path.name
+                .strip()
+                .lower()
+            )
+
+            if (
+                image_key in split_lookup
+                and split_lookup[image_key] != split
+            ):
+                raise ValueError(
+                    f"Image appears in multiple YOLO splits: "
+                    f"{image_path.name}"
+                )
+
+            split_lookup[image_key] = split
 
     return split_lookup
 
 
-def is_readable_text(
-    text,
-):
+def is_readable_text(text):
     """
     Return True only for complete alphanumeric annotations.
 
-    Examples included:
+    Included:
         46
         K97
         A31
 
-    Examples excluded:
+    Excluded:
         *
         **
         *4
@@ -170,19 +239,27 @@ def crop_tag(
 
     try:
         x1 = int(
-            float(row["x1"])
+            float(
+                row[config.CSV_X1]
+            )
         )
 
         y1 = int(
-            float(row["y1"])
+            float(
+                row[config.CSV_Y1]
+            )
         )
 
         x2 = int(
-            float(row["x2"])
+            float(
+                row[config.CSV_X2]
+            )
         )
 
         y2 = int(
-            float(row["y2"])
+            float(
+                row[config.CSV_Y2]
+            )
         )
 
     except (
@@ -246,14 +323,85 @@ def crop_tag(
     )
 
 
-def write_character_dictionary():
+def create_output_directories():
     """
-    Write PaddleOCR recognition character dictionary.
+    Recreate the generated OCR dataset directory.
+
+    Ask for confirmation before deleting an existing OCR dataset.
     """
 
-    with open(
-        OCR_CHARACTER_DICT,
-        "w",
+    if OCR_DIRECTORY.exists():
+
+        print()
+        print(
+            f"OCR dataset already exists:\n"
+            f"{OCR_DIRECTORY}"
+        )
+
+        print()
+        print(
+            "Running this script will delete the existing OCR dataset "
+            "and create a new one."
+        )
+
+        response = input(
+            "\nContinue? [y/N]: "
+        ).strip().lower()
+
+        if response not in (
+            "y",
+            "yes",
+        ):
+            print(
+                "\nDataset preparation cancelled."
+            )
+            return False
+
+        shutil.rmtree(
+            OCR_DIRECTORY
+        )
+
+    for split in config.DATASET_SPLITS:
+
+        (
+            OCR_IMAGE_DIRECTORY
+            / split
+        ).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+    (OCR_DIRECTORY / ".gitkeep").touch()
+
+    return True
+
+
+def write_label_files(labels):
+    """Write PaddleOCR label files for each dataset split."""
+
+    for split in config.DATASET_SPLITS:
+
+        label_file = (
+            OCR_DIRECTORY
+            / f"{split}.txt"
+        )
+
+        with label_file.open(
+            mode="w",
+            encoding="utf-8",
+        ) as file:
+
+            for line in labels[split]:
+                file.write(
+                    line + "\n"
+                )
+
+
+def write_character_dictionary():
+    """Write the PaddleOCR character dictionary."""
+
+    with OCR_CHARACTER_DICT.open(
+        mode="w",
         encoding="utf-8",
     ) as file:
 
@@ -263,9 +411,7 @@ def write_character_dictionary():
             )
 
 
-def write_metadata(
-    metadata_rows,
-):
+def write_metadata(metadata_rows):
     """
     Write metadata linking every OCR crop to its source image.
     """
@@ -287,9 +433,8 @@ def write_metadata(
         "crop_y2",
     ]
 
-    with open(
-        OCR_METADATA_FILE,
-        "w",
+    with OCR_METADATA_FILE.open(
+        mode="w",
         newline="",
         encoding="utf-8",
     ) as csv_file:
@@ -306,94 +451,70 @@ def write_metadata(
         )
 
 
-def main():
-    """Prepare PaddleOCR dataset."""
+def create_base_dataset():
+    """
+    Create the standard OCR train/val/test dataset.
+
+    Returns:
+        counters containing the number of crops per split
+        exclusion statistics
+    """
 
     rows = load_annotations()
 
     split_lookup = get_split_lookup()
 
-    #
-    # Recreate OCR directory.
-    #
-
-    if OCR_DIRECTORY.exists():
-        shutil.rmtree(
-            OCR_DIRECTORY
-        )
-
-    for split in (
-        "train",
-        "val",
-        "test",
-    ):
-
-        (
-            OCR_IMAGE_DIRECTORY
-            / split
-        ).mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+    if not create_output_directories():
+        return None, None
 
     labels = {
-        "train": [],
-        "val": [],
-        "test": [],
+        split: []
+        for split in config.DATASET_SPLITS
     }
 
     counters = {
-        "train": 0,
-        "val": 0,
-        "test": 0,
+        split: 0
+        for split in config.DATASET_SPLITS
     }
 
     metadata_rows = []
 
-    excluded_unreadable = 0
-    excluded_missing_split = 0
-    excluded_invalid_crop = 0
-    excluded_missing_image = 0
+    excluded = {
+        "unreadable": 0,
+        "missing_split": 0,
+        "missing_image": 0,
+        "invalid_crop": 0,
+    }
 
     for row in rows:
 
         image_name = (
-            row["image_file"]
+            row[config.CSV_IMAGE_FILE]
             .strip()
         )
 
         tag_text = (
-            row[
-                config.CSV_PLATE_TEXT
-            ]
+            row[config.CSV_PLATE_TEXT]
             .strip()
             .upper()
         )
 
         plate_color = (
-            row[
-                config.CSV_PLATE_COLOR
-            ]
+            row[config.CSV_PLATE_COLOR]
             .strip()
             .lower()
         )
 
         text_color = (
-            row[
-                config.CSV_TEXT_COLOR
-            ]
+            row[config.CSV_TEXT_COLOR]
             .strip()
             .lower()
         )
 
-        #
-        # Exclude *, **, *4, 8*, etc.
-        #
-
         if not is_readable_text(
             tag_text
         ):
-            excluded_unreadable += 1
+            excluded["unreadable"] += 1
             continue
 
         split = split_lookup.get(
@@ -401,7 +522,7 @@ def main():
         )
 
         if split is None:
-            excluded_missing_split += 1
+            excluded["missing_split"] += 1
             continue
 
         image_path = (
@@ -410,7 +531,7 @@ def main():
         )
 
         if not image_path.is_file():
-            excluded_missing_image += 1
+            excluded["missing_image"] += 1
             continue
 
         image = cv2.imread(
@@ -418,7 +539,7 @@ def main():
         )
 
         if image is None:
-            excluded_missing_image += 1
+            excluded["missing_image"] += 1
             continue
 
         crop_result = crop_tag(
@@ -427,7 +548,7 @@ def main():
         )
 
         if crop_result is None:
-            excluded_invalid_crop += 1
+            excluded["invalid_crop"] += 1
             continue
 
         (
@@ -460,14 +581,9 @@ def main():
         )
 
         if not success:
-            excluded_invalid_crop += 1
+            counters[split] -= 1
+            excluded["invalid_crop"] += 1
             continue
-
-        #
-        # PaddleOCR expects:
-        #
-        # image_path<TAB>text
-        #
 
         relative_path = (
             Path("images")
@@ -483,11 +599,6 @@ def main():
             f"{relative_path_string}\t{tag_text}"
         )
 
-        #
-        # Store information needed to trace this crop
-        # back to the original image and annotation.
-        #
-
         metadata_rows.append(
             {
                 "crop_file": relative_path_string,
@@ -497,10 +608,18 @@ def main():
                 "plate_color": plate_color,
                 "text_color": text_color,
 
-                "annotation_x1": row["x1"],
-                "annotation_y1": row["y1"],
-                "annotation_x2": row["x2"],
-                "annotation_y2": row["y2"],
+                "annotation_x1": row[
+                    config.CSV_X1
+                ],
+                "annotation_y1": row[
+                    config.CSV_Y1
+                ],
+                "annotation_x2": row[
+                    config.CSV_X2
+                ],
+                "annotation_y2": row[
+                    config.CSV_Y2
+                ],
 
                 "crop_x1": crop_x1,
                 "crop_y1": crop_y1,
@@ -509,54 +628,210 @@ def main():
             }
         )
 
-    #
-    # Write PaddleOCR label files.
-    #
-
-    for split in (
-        "train",
-        "val",
-        "test",
-    ):
-
-        label_file = (
-            OCR_DIRECTORY
-            / f"{split}.txt"
-        )
-
-        with open(
-            label_file,
-            "w",
-            encoding="utf-8",
-        ) as file:
-
-            for line in labels[split]:
-                file.write(
-                    line + "\n"
-                )
-
-    #
-    # Character dictionary.
-    #
+    write_label_files(
+        labels
+    )
 
     write_character_dictionary()
-
-    #
-    # Metadata.
-    #
 
     write_metadata(
         metadata_rows
     )
 
-    #
-    # Summary.
-    #
+    return counters, excluded
+
+
+def load_training_samples():
+    """Load the generated OCR training samples."""
+
+    train_label_file = (
+        OCR_DIRECTORY
+        / "train.txt"
+    )
+
+    samples = []
+
+    with train_label_file.open(
+        mode="r",
+        encoding="utf-8",
+    ) as file:
+
+        for line in file:
+
+            line = line.strip()
+
+            if not line:
+                continue
+
+            parts = line.split(
+                "\t",
+                1,
+            )
+
+            if len(parts) != 2:
+                raise ValueError(
+                    f"Invalid OCR label line: {line}"
+                )
+
+            image_path, label = parts
+
+            samples.append(
+                (
+                    image_path,
+                    label.strip(),
+                )
+            )
+
+    return samples
+
+
+def create_augmented_training_set():
+    """
+    Create rotated copies of all OCR training crops.
+
+    Each original training crop is included together with:
+        90°
+        180°
+        270°
+
+    Validation and test images are not augmented.
+    """
+
+    samples = load_training_samples()
+
+    AUGMENTED_IMAGE_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    augmented_lines = []
+
+    original_count = 0
+    rotated_count = 0
+    failed_count = 0
+
+    for index, (
+        relative_image_path,
+        label,
+    ) in enumerate(
+        samples,
+        start=1,
+    ):
+
+        source_path = (
+            OCR_DIRECTORY
+            / relative_image_path
+        )
+
+        image = cv2.imread(
+            str(source_path)
+        )
+
+        if image is None:
+            print(
+                f"Could not read: "
+                f"{source_path}"
+            )
+
+            failed_count += 1
+            continue
+
+        original_name = (
+            f"tag_{index:06d}.jpg"
+        )
+
+        original_output_path = (
+            AUGMENTED_IMAGE_DIRECTORY
+            / original_name
+        )
+
+        if not cv2.imwrite(
+            str(original_output_path),
+            image,
+        ):
+            failed_count += 1
+            continue
+
+        original_relative_path = (
+            Path("images")
+            / "train_augmented"
+            / original_name
+        )
+
+        augmented_lines.append(
+            f"{original_relative_path.as_posix()}"
+            f"\t{label}"
+        )
+
+        original_count += 1
+
+        for (
+            suffix,
+            rotation_code,
+        ) in ROTATIONS.items():
+
+            rotated = cv2.rotate(
+                image,
+                rotation_code,
+            )
+
+            rotated_name = (
+                f"tag_{index:06d}_{suffix}.jpg"
+            )
+
+            rotated_output_path = (
+                AUGMENTED_IMAGE_DIRECTORY
+                / rotated_name
+            )
+
+            if not cv2.imwrite(
+                str(rotated_output_path),
+                rotated,
+            ):
+                failed_count += 1
+                continue
+
+            rotated_relative_path = (
+                Path("images")
+                / "train_augmented"
+                / rotated_name
+            )
+
+            augmented_lines.append(
+                f"{rotated_relative_path.as_posix()}"
+                f"\t{label}"
+            )
+
+            rotated_count += 1
+
+    with AUGMENTED_LABEL_FILE.open(
+        mode="w",
+        encoding="utf-8",
+    ) as file:
+
+        for line in augmented_lines:
+            file.write(
+                line + "\n"
+            )
+
+    return {
+        "original": original_count,
+        "rotated": rotated_count,
+        "failed": failed_count,
+    }
+
+
+def print_summary(
+    counters,
+    excluded,
+    augmentation_statistics=None,
+):
+    """Print dataset-preparation statistics."""
 
     print()
-    print("=" * 50)
+    print("=" * 55)
     print("OCR Dataset Preparation")
-    print("=" * 50)
+    print("=" * 55)
 
     print()
 
@@ -579,23 +854,57 @@ def main():
 
     print(
         f"Excluded unreadable/partial : "
-        f"{excluded_unreadable}"
+        f"{excluded['unreadable']}"
     )
 
     print(
         f"Excluded missing split      : "
-        f"{excluded_missing_split}"
+        f"{excluded['missing_split']}"
     )
 
     print(
         f"Excluded missing image      : "
-        f"{excluded_missing_image}"
+        f"{excluded['missing_image']}"
     )
 
     print(
         f"Excluded invalid crop       : "
-        f"{excluded_invalid_crop}"
+        f"{excluded['invalid_crop']}"
     )
+
+    if augmentation_statistics is not None:
+
+        print()
+        print("-" * 55)
+        print("Training augmentation")
+        print("-" * 55)
+
+        print(
+            f"Original samples : "
+            f"{augmentation_statistics['original']}"
+        )
+
+        print(
+            f"Rotated samples  : "
+            f"{augmentation_statistics['rotated']}"
+        )
+
+        print(
+            f"Total samples    : "
+            f"{augmentation_statistics['original'] + augmentation_statistics['rotated']}"
+        )
+
+        print(
+            f"Failed images    : "
+            f"{augmentation_statistics['failed']}"
+        )
+
+        print()
+
+        print(
+            f"Augmented labels:\n"
+            f"{AUGMENTED_LABEL_FILE}"
+        )
 
     print()
 
@@ -609,6 +918,51 @@ def main():
     print(
         f"Crop metadata saved to:\n"
         f"{OCR_METADATA_FILE}"
+    )
+
+
+def main():
+    """Prepare the PaddleOCR dataset."""
+
+    args = parse_arguments()
+
+    if not config.ANNOTATION_FILE.is_file():
+        raise FileNotFoundError(
+            f"Annotation file not found:\n"
+            f"{config.ANNOTATION_FILE}"
+        )
+
+    if not config.RAW_IMAGE_DIRECTORY.is_dir():
+        raise FileNotFoundError(
+            f"Raw image directory not found:\n"
+            f"{config.RAW_IMAGE_DIRECTORY}"
+        )
+
+    if not config.YOLO_IMAGE_DIRECTORY.is_dir():
+        raise FileNotFoundError(
+            f"YOLO dataset not found:\n"
+            f"{config.YOLO_IMAGE_DIRECTORY}\n\n"
+            "Prepare the YOLO dataset first."
+        )
+
+    counters, excluded = (
+        create_base_dataset()
+    )
+
+    if counters is None:
+        return
+
+    augmentation_statistics = None
+
+    if args.augment:
+        augmentation_statistics = (
+            create_augmented_training_set()
+        )
+
+    print_summary(
+        counters=counters,
+        excluded=excluded,
+        augmentation_statistics=augmentation_statistics,
     )
 
 
