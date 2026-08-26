@@ -1,333 +1,379 @@
 # Wing Tag Detection and Recognition Pipeline
 
-A computer vision pipeline for detecting griffon vulture wing tags, identifying their colors, and reading the alphanumeric code printed on each tag.
+Computer vision pipeline for detecting and recognizing wing tags on griffon vultures.
 
-The project combines:
+The pipeline combines:
 
-- **YOLO** for wing tag detection
-- **OpenCV** for wing tag color classification
-- **EasyOCR** for optical character recognition (OCR)
+- **YOLO** for wing-tag detection
+- **OpenCV** for plate and text color classification
+- **PaddleOCR** for wing-tag identifier recognition
 
----
-
-# Pipeline Overview
-
-```
-Input Image
-      │
-      ▼
-YOLO
-Wing Tag Detection
-      │
-      ▼
-Crop Each Detected Tag
-      │
-      ├──────────────► Color Detection (OpenCV)
-      │
-      └──────────────► OCR (EasyOCR)
-      │
-      ▼
-Final Prediction
-```
-
-For every detected wing tag, the pipeline returns:
-
-- Bounding box
-- Detection confidence
-- Plate color
-- Text color
-- Color confidence
-- Recognized text
-- OCR confidence
-
----
-
-# Project Structure
-
-```
-project/
-│
-├── config.py
-├── prepare_dataset.py
-├── train.py
-├── predict.py
-├── visualize_dataset.py
-├── merge_dataset.py
-├── dataset_statistics.py
-│
-├── color_utils.py
-├── ocr_utils.py
-├── image_utils.py
-│
-├── data/
-│   ├── raw/
-│   └── yolo/
-│
-├── outputs/
-├── prediction/
-└── runs/
-```
-
----
-
-# Script Overview
-
-| Script | Purpose |
-|---------------------------|---------------------------|
-| **merge_dataset.py** | Merges a new raw dataset into the existing raw dataset, automatically renaming duplicate images and updating annotations. |
-| **dataset_statistics.py** | Displays summary statistics of the raw annotation dataset. |
-| **prepare_dataset.py** | Converts the raw dataset into the YOLO format, creates the train/validation/test split and generates `data.yaml`. |
-| **visualize_dataset.py** | Displays annotated images from the YOLO dataset for inspection and quality control. |
-| **train.py** | Trains a YOLO detector using the YOLO dataset and copies the best model to the output directory. |
-| **predict.py** | Runs the complete inference pipeline on a single image or an entire directory. |
-| **color_utils.py** | Determines wing tag plate and text colors using classical computer vision techniques. |
-| **ocr_utils.py** | Reads the wing tag identifier using EasyOCR. |
-| **image_utils.py** | Helper functions for loading and enumerating image files. |
-| **config.py** | Central configuration file containing paths, model parameters and project settings. |
-
----
-
-# Raw Dataset
-
-The repository stores the original images and annotation file inside
-
-```
-data/raw/
-```
-
-The raw dataset consists of:
-
-- original images
-- `annotations.csv`
-
-### Dataset Merging
-
-Merge a new annotated dataset into the existing raw dataset:
-
-```bash
-python merge_dataset.py path/to/new_dataset
-```
-
-The input directory must contain the images together with an `annotations.csv` file.
-
-The script automatically:
-
-- copies supported images into `data/raw/images`
-- appends annotations to `data/raw/annotations.csv`
-- renames duplicate image filenames and updates the corresponding annotations
-
----
-
-### Dataset Statistics
-
-Display summary statistics for the raw dataset:
-
-```bash
-python dataset_statistics.py
-```
-
-The script reports:
-
-- plate/text color combinations and their frequencies
-- unique wing tag identifiers and their frequencies
-- identifier frequencies grouped by plate/text color combination
-
----
-
-### Dataset Preparation
-
-Convert the raw dataset into the YOLO dataset:
-
-```bash
-python prepare_yolo_dataset.py
-```
-
-This script automatically:
-
-- creates the train/validation/test split
-- converts annotations to the YOLO format
-- generates label files
-- creates the YOLO `data.yaml` configuration file
-
----
-
-# YOLO Dataset
-
-After running `prepare_dataset.py`, the generated YOLO dataset is stored in
-
-```
-data/yolo/
-```
-
-### Dataset Visualization
-
-Inspect random 5 images:
-
-```bash
-python visualize_dataset.py
-```
-
-Inspect a specific image:
-
-```bash
-python visualize_dataset.py --image IMG_0123.jpg
-```
-
-Inspect multiple random images:
-
-```bash
-python visualize_dataset.py --num 20
-```
-
----
-
-# Training
-
-Train the detector:
-
-```bash
-python train_yolo.py
-```
-
-The best-performing model is automatically copied to
-
-```
-outputs/models/best.pt
-```
-
-The training configuration (model, image size, epochs, batch size, etc.) is defined in `config.py`.
-
----
-
-# Prediction
-
-Run inference on a single image:
-
-```bash
-python predict.py --image path/to/image.jpg
-```
-
-Run inference on an entire directory:
-
-```bash
-python predict.py --directory path/to/images
-```
-
-Annotated images are saved to
-
-```
-prediction/
-```
-
----
-
-# Prediction Pipeline
-
-The prediction pipeline consists of four consecutive stages.
-
-## 1. Wing Tag Detection
-
-The input image is processed by a YOLO object detector trained to identify griffon vulture wing tags.
-
-For every detected tag, the detector returns:
-
-- bounding box
-- confidence score
-- class label
-
-Each detected tag is cropped and processed independently by the remaining stages of the pipeline.
-
----
-
-## 2. Color Detection (`color_utils.py`)
-
-The cropped wing tag is analyzed using classical computer vision techniques.
-
-The processing steps are:
-
-1. Crop the central region of the detection to reduce background.
-2. Convert the image from RGB to HSV.
-3. Threshold the image using predefined HSV color ranges.
-4. Determine the dominant wing tag plate color.
-5. Extract the largest connected component.
-6. Reconstruct the plate using its convex hull.
-7. Search only for text colors that are valid for the detected plate color.
-8. Compute a color confidence score based on the proportion of supporting pixels.
-
-This module is entirely based on OpenCV image processing.
-
----
-
-## 3. Optical Character Recognition (`ocr_utils.py`)
-
-The cropped wing tag is preprocessed before OCR.
-
-The preprocessing consists of:
-
-- conversion to grayscale
-- image upscaling
-- Gaussian blur
-
-The processed image is passed to EasyOCR, which returns all detected text candidates.
-
-The candidate with the highest confidence is selected as the final wing tag identifier.
-
----
-
-## 4. Result Visualization (`predict.py`)
-
-Finally, all results are combined into a single prediction.
-
-For every detected wing tag, the output image contains:
+For each detected wing tag, the pipeline can return:
 
 - bounding box
 - detection confidence
 - plate color
 - text color
+- color confidence
 - recognized identifier
 - OCR confidence
 
-The annotated image is written to the `prediction/` directory.
-
 ---
 
-# Output Format
+## Pipeline
 
-Each detected wing tag contains the following information.
-
-| Field | Description |
-|-----------------------|-----------------------|
-| `bbox` | Bounding box coordinates |
-| `confidence` | Detection confidence |
-| `plate_color` | Detected wing tag plate color |
-| `text_color` | Detected text color |
-| `color_confidence` | Confidence of the color classification |
-| `text` | Recognized wing tag identifier |
-| `text_confidence` | OCR confidence |
-
----
-
-# Configuration
-
-Most project settings are located in
-
+```text
+Input image
+    │
+    ▼
+YOLO
+Wing-tag detection
+    │
+    ▼
+Detected tag crop
+    │
+    ├──► Color classification (OpenCV)
+    │
+    └──► Identifier recognition (PaddleOCR)
+    │
+    ▼
+Final prediction
 ```
+
+Color classification and OCR can be enabled or disabled independently in `config.py`.
+
+---
+
+## Project Structure
+
+```text
+saige-supovi/
+│
+├── config.py
+├── prepare_yolo_dataset.py
+├── prepare_ocr_dataset.py
+├── train_yolo.py
+├── predict.py
+├── evaluate.py
+├── requirements.txt
+│
+├── data/
+│   ├── raw/
+│   │   └── images/
+│   ├── yolo/
+│   │   ├── images/
+│   │   └── labels/
+│   └── ocr/
+│       └── images/
+│
+├── models/
+│   ├── yolo/
+│   │   └── best.pt
+│   └── paddleocr/
+│       ├── inference.json
+│       ├── inference.pdiparams
+│       └── inference.yml
+│
+├── outputs/
+├── runs/
+│
+├── utils/
+│   ├── color_utils.py
+│   ├── image_utils.py
+│   └── ocr_utils.py
+│
+└── tools/
+    ├── dataset_statistics.py
+    ├── merge_dataset.py
+    └── visualize_dataset.py
+```
+
+The raw dataset is not included in the repository.
+
+The trained YOLO detector and exported PaddleOCR recognition model used for inference are included under `models/`.
+
+---
+
+## Installation
+
+Create and activate a Python virtual environment, then install PaddlePaddle separately according to the hardware being used.
+
+PaddlePaddle provides separate CPU and GPU installations. The development environment for this project used:
+
+```text
+paddlepaddle-gpu==3.2.0
+```
+
+After installing the appropriate PaddlePaddle version, install the remaining project dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+The tested direct dependencies are defined in `requirements.txt`.
+
+---
+
+## Raw Dataset
+
+The expected raw dataset structure is:
+
+```text
+data/raw/
+├── annotations.csv
+└── images/
+```
+
+`annotations.csv` contains the image filename, wing-tag bounding box, plate color, text color, and tag identifier.
+
+The raw images and annotations are intentionally excluded from Git.
+
+---
+
+## Preparing the YOLO Dataset
+
+Convert the raw dataset into YOLO format:
+
+```bash
+python prepare_yolo_dataset.py
+```
+
+The script:
+
+- creates train, validation, and test splits
+- keeps positive and negative images distributed across the splits
+- converts bounding boxes to YOLO format
+- creates YOLO label files
+- generates `data/yolo/data.yaml`
+
+The generated dataset is stored under:
+
+```text
+data/yolo/
+```
+
+---
+
+## Training YOLO
+
+Train the wing-tag detector:
+
+```bash
+python train_yolo.py
+```
+
+Training settings such as the YOLO model, image size, epochs, batch size, device, and augmentation parameters are defined in `config.py`.
+
+Training runs are stored under:
+
+```text
+runs/
+```
+
+The best model is copied to:
+
+```text
+models/yolo/best.pt
+```
+
+A trained model is already included in the repository, so training is not required for inference.
+
+---
+
+## OCR Dataset Preparation
+
+The OCR dataset is generated from the original annotations while reusing the existing YOLO train/validation/test split:
+
+```bash
+python prepare_ocr_dataset.py
+```
+
+Only fully readable identifiers are included. Annotations containing `*` are excluded from OCR training data.
+
+Optional rotation augmentation can be generated with:
+
+```bash
+python prepare_ocr_dataset.py --augment
+```
+
+This adds 90°, 180°, and 270° rotations of each training crop.
+
+The generated OCR dataset is stored under:
+
+```text
+data/ocr/
+```
+
+### OCR Model Training
+
+The OCR model itself is **not trained in this repository**.
+
+OCR fine-tuning was performed separately using the [PaddleOCR repository](https://github.com/PaddlePaddle/PaddleOCR).
+
+This repository contains:
+
+- the script used to prepare the OCR dataset
+- the exported fine-tuned inference model under `models/paddleocr/`
+- the inference code used by the final recognition pipeline
+
+The PaddleOCR training code and training procedure remain external to this repository.
+
+---
+
+## Prediction
+
+Run the complete pipeline on one image:
+
+```bash
+python predict.py --image path/to/image.jpg
+```
+
+Run it on all supported images in a folder:
+
+```bash
+python predict.py --folder path/to/images
+```
+
+Predicted images are saved under:
+
+```text
+outputs/predictions/
+```
+
+The pipeline stages are controlled in `config.py`:
+
+```python
+ENABLE_COLOR_CLASSIFICATION = True
+ENABLE_OCR = True
+```
+
+Setting either option to `False` disables that stage.
+
+---
+
+## Evaluation
+
+Evaluate one of the generated dataset splits:
+
+```bash
+python evaluate.py --split val
+```
+
+or:
+
+```bash
+python evaluate.py --split test
+```
+
+Supported values are:
+
+```text
+train
+val
+test
+```
+
+Detection predictions are matched to ground-truth tags using Intersection over Union (IoU).
+
+Depending on the enabled pipeline stages, the evaluation reports:
+
+- detection precision and recall
+- plate-color accuracy
+- text-color accuracy
+- full color-pair accuracy
+- exact OCR accuracy
+- compatibility with partially readable OCR annotations
+
+Detailed results are saved as:
+
+```text
+outputs/evaluation_train.csv
+outputs/evaluation_val.csv
+outputs/evaluation_test.csv
+```
+
+---
+
+## Utility Tools
+
+### Dataset Statistics
+
+Display statistics for the raw annotation dataset:
+
+```bash
+python tools/dataset_statistics.py
+```
+
+### Dataset Visualization
+
+Visualize random YOLO samples:
+
+```bash
+python tools/visualize_dataset.py
+```
+
+Visualize a specific split:
+
+```bash
+python tools/visualize_dataset.py --split val --num 20
+```
+
+Visualize raw annotations:
+
+```bash
+python tools/visualize_dataset.py --raw
+```
+
+### Merge Additional Data
+
+Merge another annotated image collection into the existing raw dataset:
+
+```bash
+python tools/merge_dataset.py path/to/new_dataset
+```
+
+The input directory must contain its images and an `annotations.csv` file.
+
+---
+
+## Configuration
+
+Project paths and configurable parameters are defined in:
+
+```text
 config.py
 ```
 
-These include:
+The main configuration groups include:
 
-- dataset paths
-- train/validation/test split
-- model configuration
-- image size
-- batch size
-- confidence threshold
-- output directories
-- supported image extensions
+- dataset paths and splits
+- YOLO model and training parameters
+- YOLO augmentation
+- OCR model settings
+- inference thresholds
+- optional prediction stages
+- visualization settings
+- valid wing-tag color combinations
 
 ---
 
-# License
+## Models
 
-This repository was developed as part of an internal research project at the Institute for Artificial Intelligence Research and Development of Serbia (IVI).
+The repository contains the models required for inference:
+
+```text
+models/yolo/best.pt
+models/paddleocr/
+```
+
+The YOLO model detects wing tags.
+
+The PaddleOCR model is a fine-tuned text-recognition model used to read the alphanumeric identifier from each detected tag.
+
+OCR inference is evaluated at 0°, 90°, 180°, and 270° rotations, and the highest-confidence result is selected.
+
+---
+
+## Project Context
+
+This repository was developed as part of a research project at the Institute for Artificial Intelligence Research and Development of Serbia.

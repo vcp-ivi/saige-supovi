@@ -1,14 +1,10 @@
 """
-Analyze dataset statistics.
+dataset_statistics.py
 
-This script prints useful information about the annotation dataset:
-- Total number of annotated plates
-- Plate/text color combinations
-- Unique tag texts and their frequencies
-- Tag text frequencies grouped by plate/text color combination
+Print summary statistics for the raw wing-tag annotation dataset.
 
 Usage:
-    python utils/dataset_statistics.py
+    python tools/dataset_statistics.py
 """
 
 from __future__ import annotations

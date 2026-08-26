@@ -1,24 +1,14 @@
 """
 predict.py
 
-Run YOLO inference on a single image or all images in a folder.
+Run the wing-tag recognition pipeline on a single image or all supported
+images in a folder.
 
-Optional post-processing:
-- Wing-tag color classification
-- OCR text recognition
+Optional color classification and OCR stages are controlled in config.py.
 
-These can be enabled/disabled in config.py:
-
-    ENABLE_COLOR_CLASSIFICATION = True
-    ENABLE_OCR = True
-
-Examples
---------
-Predict on all images in folder:
-    python predict.py --folder data/yolo/images/train/
-
-Predict on a specific image:
-    python predict.py --image IMG_123.jpg
+Usage:
+    python predict.py --image path/to/image.jpg
+    python predict.py --folder path/to/images
 """
 
 import argparse

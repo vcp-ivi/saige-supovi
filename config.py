@@ -1,8 +1,7 @@
 """
 config.py
 
-Central configuration file containing all user-configurable parameters
-for the project.
+Central configuration file containing user-configurable project parameters.
 """
 
 from pathlib import Path

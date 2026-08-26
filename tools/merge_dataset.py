@@ -1,8 +1,10 @@
 """
 merge_dataset.py
 
-Merge a newly received image folder and its annotations into the
-project's existing raw dataset.
+Merge a newly received annotated image dataset into the existing raw dataset.
+
+Usage:
+    python tools/merge_dataset.py path/to/new_dataset
 """
 
 import argparse

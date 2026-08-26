@@ -3,7 +3,8 @@ prepare_yolo_dataset.py
 
 Convert the original wing-tag annotations into a YOLO dataset.
 
-data/raw -> data/yolo
+Usage:
+    python prepare_yolo_dataset.py
 """
 
 import csv

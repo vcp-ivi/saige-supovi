@@ -1,55 +1,13 @@
 """
 prepare_ocr_dataset.py
 
-Create a PaddleOCR text-recognition dataset from wing-tag annotations.
+Create PaddleOCR text-recognition datasets from the annotated wing tags.
 
-The existing YOLO train/val/test image split is reused so that OCR
-training, validation, and testing remain separated by source image.
+The existing YOLO train/val/test split is reused. Only fully readable
+identifiers are included.
 
-Only fully readable tag annotations are included.
-Annotations containing "*" are excluded.
-
-Optionally, the training set can be augmented with 90°, 180°, and
-270° rotations.
-
-Outputs
--------
-Without augmentation:
-
-    data/ocr/
-        images/
-            train/
-            val/
-            test/
-        train.txt
-        val.txt
-        test.txt
-        character_dict.txt
-        metadata.csv
-
-With --augment:
-
-    data/ocr/
-        images/
-            train/
-            val/
-            test/
-            train_augmented/
-        train.txt
-        train_augmented.txt
-        val.txt
-        test.txt
-        character_dict.txt
-        metadata.csv
-
-Examples
---------
-Prepare the OCR dataset:
-
+Usage:
     python prepare_ocr_dataset.py
-
-Prepare the dataset and create rotated training samples:
-
     python prepare_ocr_dataset.py --augment
 """
 

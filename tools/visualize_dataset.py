@@ -1,37 +1,19 @@
 """
 visualize_dataset.py
 
-Visualize wing-tag dataset annotations.
+Visualize YOLO or raw wing-tag dataset annotations.
 
-Two visualization modes are supported:
-
-1. YOLO annotations
-   Visualizes the generated YOLO dataset.
-
-2. Raw annotations
-   Visualizes the original annotations.csv directly on the raw images,
-   including tag identifier, plate color, and text color.
-
-Examples
---------
-Random 5 YOLO images:
-    python utils/visualize_dataset.py
-
-Random 20 validation images:
-    python utils/visualize_dataset.py --split val --num 20
-
-Specific YOLO image:
-    python utils/visualize_dataset.py --image IMG_123
-
-Random 5 raw annotated images:
-    python utils/visualize_dataset.py --raw
-
-Random 50 raw annotated images:
-    python utils/visualize_dataset.py --raw --num 50
-
-Specific raw image:
-    python utils/visualize_dataset.py --raw --image IMG_123.jpg
+Usage:
+    python tools/visualize_dataset.py
+    python tools/visualize_dataset.py --num 20
+    python tools/visualize_dataset.py --split val
+    python tools/visualize_dataset.py --split val --num 20
+    python tools/visualize_dataset.py --image IMG_123.jpg
+    python tools/visualize_dataset.py --raw
+    python tools/visualize_dataset.py --raw --num 20
+    python tools/visualize_dataset.py --raw --image IMG_123.jpg
 """
+
 
 import argparse
 import csv

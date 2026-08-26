@@ -1,35 +1,7 @@
 """
 color_utils.py
 
-Utilities for identifying wing-tag plate and text colors.
-
-The module classifies the plate and text colors of a cropped wing tag.
-
-YOLO crop
-      │
-      ▼
-Crop away image borders
-      │
-      ▼
-Convert to HSV
-      │
-      ▼
-Determine plate color
-      │
-      ▼
-Find largest connected component
-      │
-      ▼
-Reconstruct plate (convex hull)
-      │
-      ▼
-Determine text color
-      │
-      ▼
-Compute confidence
-      │
-      ▼
-Return result
+OpenCV utilities for classifying wing-tag plate and text colors.
 """
 
 from typing import Any

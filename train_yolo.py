@@ -2,6 +2,9 @@
 train_yolo.py
 
 Train a YOLO model on the prepared wing-tag dataset.
+
+Usage:
+    python train_yolo.py
 """
 
 import shutil

@@ -1,40 +1,15 @@
 """
 evaluate.py
 
-Evaluate YOLO detection, color classification, and OCR against
-data/raw/annotations.csv.
+Evaluate wing-tag detection, color classification, and OCR against the
+ground-truth annotations.
 
-The dataset split is selected with --split.
+Enabled stages are controlled in config.py.
 
-The evaluated stages depend on config.py:
-
-    ENABLE_COLOR_CLASSIFICATION = False
-    ENABLE_OCR = False
-
-Examples
---------
-Evaluate the validation split:
-
+Usage:
+    python evaluate.py --split train
     python evaluate.py --split val
-
-Evaluate the test split:
-
     python evaluate.py --split test
-
-YOLO only:
-
-    ENABLE_COLOR_CLASSIFICATION = False
-    ENABLE_OCR = False
-
-YOLO + colors:
-
-    ENABLE_COLOR_CLASSIFICATION = True
-    ENABLE_OCR = False
-
-Full pipeline:
-
-    ENABLE_COLOR_CLASSIFICATION = True
-    ENABLE_OCR = True
 """
 
 import argparse

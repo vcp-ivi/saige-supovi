@@ -1,7 +1,10 @@
 """
 ocr_utils.py
 
-OCR utilities using the fine-tuned PaddleOCR wing-tag model.
+OCR utilities for the fine-tuned PaddleOCR wing-tag recognition model.
+
+The model was trained separately using the PaddleOCR codebase and is
+loaded here from models/paddleocr/.
 """
 
 import cv2
