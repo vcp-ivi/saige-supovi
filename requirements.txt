@@ -1,7 +1,7 @@
-certifi
-numpy
-opencv-python
-PaddleOCR
-Pillow
-PyYAML
-ultralytics
+certifi==2026.7.22
+numpy==2.3.5
+opencv-python==5.0.0.93
+paddleocr==3.7.0
+Pillow==12.3.0
+PyYAML==6.0.2
+ultralytics==8.4.127
